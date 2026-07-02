@@ -340,6 +340,7 @@ SCENARIOER = [
         "tittel": "Mikro uten integrasjon",
         "icon": "person",
         "beskrivelse": "ENK eller liten AS med minimal aktivitet. Ingen KID-fakturering, ingen integrasjon. Tre utbetalinger per måned, ett bedriftskort med ti varekjøp.",
+        "dnb_asterisk": True,
         "folio": {"nettbank": "89", "total": 89},
         "aktivitet": {
             "med_integrasjon": False,
@@ -394,6 +395,7 @@ SCENARIOER = [
         "tittel": "Inaktiv holding",
         "icon": "piggybank",
         "beskrivelse": "Ingen kortbruk og null transaksjoner. Viser minimumskostnaden for å holde en konto åpen.",
+        "dnb_asterisk": True,
         "folio": {"nettbank": "89", "total": 89},
         "aktivitet": {
             "med_integrasjon": False,
@@ -528,7 +530,7 @@ def beregn_scenarioer(alle_priser):
             bank_vs = [bd[0][i][1] if i < len(bd[0]) else "—" for bd in bank_data]
             merged.append((label, [folio_v] + bank_vs))
         totaler = [str(s["folio"]["total"])] + [str(bd[1]) for bd in bank_data]
-        result.append({**s, "rader": merged, "totaler": totaler})
+        result.append({**s, "rader": merged, "totaler": totaler, "dnb_asterisk": s.get("dnb_asterisk", False)})
     return result
 
 FORUTSETNINGER = [
@@ -574,11 +576,20 @@ _HTML_CSS = """
     color: var(--ink); text-wrap: balance; margin-bottom: .2rem;
   }
   .masthead .dateline { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-light); }
+  .masthead .dateline a { color: var(--ink-light); text-decoration: none; }
+  .masthead .dateline a:hover { color: var(--ink); }
   .section-label {
     font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
     color: var(--ink-light); margin: 2.5rem 0 .9rem; padding-bottom: .4rem; border-bottom: 1px solid var(--rule);
   }
+  .section-heading {
+    font-family: Georgia, "Times New Roman", serif; font-weight: 300;
+    font-size: 1.15rem; color: var(--ink); margin: 2.5rem 0 .9rem;
+  }
   .summary-wrap { overflow-x: auto; }
+  .anker-lenke { margin: .8rem 0 0; font-size: .8rem; }
+  .anker-lenke a { color: var(--ink-light); text-decoration: none; }
+  .anker-lenke a:hover { color: var(--accent); }
   table.summary {
     width: 100%; border-collapse: collapse; font-size: 0.97rem;
     font-variant-numeric: tabular-nums; table-layout: fixed;
@@ -590,7 +601,15 @@ _HTML_CSS = """
     text-transform: uppercase; color: var(--ink-light);
     padding: .5rem .6rem .5rem 0; border-bottom: 1px solid var(--rule-dark); white-space: nowrap;
   }
-  table.summary thead th:first-child { text-align: left; padding-left: 0; }
+  table.summary thead th:not(:first-child) {
+    display: table-cell; vertical-align: bottom; text-align: right;
+  }
+  .bank-logo {
+    display: block; height: 36px; width: auto; max-width: 96px;
+    object-fit: contain; object-position: right bottom;
+    margin: 0 0 .9rem auto;
+  }
+  table.summary thead th:first-child { text-align: left; padding-left: 0; vertical-align: bottom; }
   table.summary thead th:not(:first-child) { color: var(--ink); }
   tr.summary-row { cursor: pointer; }
   tr.summary-row td {
@@ -606,9 +625,11 @@ _HTML_CSS = """
   }
   .scenario-name svg { flex-shrink: 0; width: 16px; height: 16px; position: relative; top: -1px; }
   .toggle-icon {
-    display: inline-block; font-size: .935rem; color: var(--ink-mid); margin-left: .4rem;
-    transition: transform .2s; vertical-align: middle; line-height: 1; position: relative; top: -2px;
+    display: inline-block; font-size: 1.4rem; color: var(--ink); margin-left: .4rem;
+    transition: transform .2s, color .15s; vertical-align: middle; line-height: 1;
+    position: relative; top: -4px; transform-origin: center 55%;
   }
+  tr.summary-row:hover .toggle-icon { color: #F46147; }
   tr.summary-row.open .toggle-icon { transform: rotate(180deg); }
   tr.detail-row { display: none; }
   tr.detail-row.open { display: table-row; }
@@ -656,11 +677,13 @@ _HTML_CSS = """
   .sc-def dt { font-weight: 600; font-size: .8rem; color: var(--ink); margin-bottom: .1rem; }
   .sc-def dd { font-size: .8rem; font-weight: 300; color: var(--ink-light); line-height: 1.55; margin-left: 0; }
   .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: .5rem; }
-  .footer .disclaimer { font-size: .72rem; color: var(--ink-light); line-height: 1.55; }
-  .footer .kilder { font-size: .7rem; color: var(--ink-light); }
-  .footer .kilder ul { list-style: none; display: flex; flex-wrap: wrap; gap: .15rem .75rem; margin-top: .25rem; }
-  .footer .kilder a { color: var(--ink-light); text-underline-offset: 2px; }
-  .footer .kilder a:hover { color: var(--ink); }
+  .footer .disclaimer { font-size: .72rem; color: var(--ink-light); line-height: 1.55; margin-top: 1.5rem; }
+  sup.asterisk { font-size: .85em; color: var(--ink-light); vertical-align: super; margin-left: 1px; }
+  .fotnote { font-size: .78rem; font-weight: 300; color: var(--ink-light); line-height: 1.55; margin-top: 1rem; }
+  .fotnote strong { font-weight: 700; color: var(--ink); }
+  .kilder-liste { list-style: none; display: flex; flex-wrap: wrap; gap: .15rem .75rem; font-size: 1rem; }
+  .kilder-liste a { color: var(--ink-mid); text-underline-offset: 2px; }
+  .kilder-liste a:hover { color: var(--ink); }
   .advarsel {
     border: 1px solid #f97316; background: #fff7ed;
     border-radius: 3px; padding: .75rem 1rem; margin-bottom: 1.5rem; font-size: .875rem;
@@ -694,11 +717,34 @@ def _td_val(v):
     return f"<td>{v}</td>"
 
 
+LOGO_FILER = {
+    "Folio":          ("logoer/Folio icon square.png", "image/png",  -3),
+    "DNB":            ("logoer/DNB_ASA.png",           "image/png",  -9),
+    "SB1 SMN":        ("logoer/spb1.jpg",              "image/jpeg", 8),
+    "SB1 Østlandet":  ("logoer/spb1.jpg",              "image/jpeg", 8),
+}
+
+def _logo_tag(bank):
+    import base64, os
+    info = LOGO_FILER.get(bank)
+    if not info:
+        return ""
+    path, mime, pad = info
+    if not os.path.exists(path):
+        return ""
+    data = base64.b64encode(open(path, "rb").read()).decode()
+    return f'<img src="data:{mime};base64,{data}" class="bank-logo" style="margin-right:{pad}px" alt="{bank}">'
+
+
 def lag_html(alle_priser, advarsler, rad_advarsler):
     scenarioer = beregn_scenarioer(alle_priser)
     banker = [p["bank"] for p in alle_priser]
     alle_banker = ["Folio"] + banker
     alle_banker_display = [BANK_DISPLAY.get(b, b) for b in alle_banker]
+    bank_header_ths = "".join(
+        f'<th>{_logo_tag(b)}<span>{BANK_DISPLAY.get(b, b)}</span></th>'
+        for b in alle_banker
+    )
 
     folio_priser = {
         "bank": "Folio",
@@ -733,7 +779,11 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
     accordion_rader = ""
     for s in scenarioer:
         icon = IKONER[s["icon"]]
-        totaler_html = "".join(f"<td>{t}</td>" for t in s["totaler"])
+        dnb_idx = 1  # Folio=0, DNB=1
+        totaler_html = "".join(
+            f'<td>{t} kr<sup class="asterisk">*</sup></td>' if i == dnb_idx and s.get("dnb_asterisk") else f'<td>{t} kr</td>'
+            for i, t in enumerate(s["totaler"])
+        )
         accordion_rader += (
             f'<tr class="summary-row" data-target="detail-{s["id"]}">'
             f'<td><span class="scenario-name">{icon}{s["tittel"]}</span>'
@@ -748,7 +798,6 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
             )
 
     bank_header_cols = "".join(f"<col class=\"col-bank\">" for _ in alle_banker)
-    bank_header_ths = "".join(f"<th>{b}</th>" for b in alle_banker_display)
 
     # Om scenariene
     om_scenariene = ""
@@ -766,12 +815,14 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
     # Listepriser
     pris_seksjoner = ""
     for tittel, felt_liste in KATEGORIER:
-        header_ths = "<th>Tjeneste</th>" + "".join(f"<th>{b}</th>" for b in alle_banker_display)
+        if tittel == "Rentebetingelser":
+            pris_seksjoner += '<p class="section-heading">Renter</p>\n'
+        header_ths = "<th>Tjeneste</th>" + "".join(f"<th>{BANK_DISPLAY.get(b, b)}</th>" for b in banker)
         rader_html = ""
         for felt in felt_liste:
             display = FELT_DISPLAY.get(felt, felt)
             celler = f"<td>{display}</td>"
-            for p in alle_priser_med_folio:
+            for p in alle_priser:
                 v = normaliser_verdi(p.get(felt)) if p.get(felt) else "—"
                 celler += _td_val(v)
             rader_html += f"<tr>{celler}</tr>\n"
@@ -811,11 +862,12 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
 
   <header class="masthead">
     <h1>Priser bedriftsbank</h1>
-    <p class="dateline">Oppdatert {today}</p>
+    <p class="dateline">Oppdatert {today} · <a href="#kilder">Kilder ↓</a></p>
   </header>
 
   {advarsel_html}
 
+  <p class="section-heading">Kostnader per måned</p>
   <div class="summary-wrap">
     <table class="summary">
       <colgroup>
@@ -832,11 +884,16 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
         {accordion_rader}
       </tbody>
     </table>
+    <p class="anker-lenke"><a href="#om-eksempelkundene">Om beregningen ↓</a></p>
   </div>
 
+  <p class="section-label">Listepriser</p>
+  {pris_seksjoner}
+
+  <p class="section-heading" id="om-eksempelkundene">Om beregningen</p>
   <div class="to-kolonner">
     <div>
-      <p class="section-label">Om scenariene</p>
+      <p class="section-label">Eksempelkundene</p>
       <div class="scenario-beskrivelser">
         <dl>{om_scenariene}</dl>
       </div>
@@ -846,18 +903,14 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
       <div class="forutsetninger">
         <ul>{forutsetninger_html}</ul>
       </div>
+      <p class="fotnote"><strong>* DNB indikerer noen steder kr 0</strong> per måned for konto, men det er uklart om dette alternativet faktisk tilbys, eller om kr 69 (transaksjons-bundle) er reell minimumspris. Vi bruker det likevel her.</p>
     </div>
   </div>
 
-  <p class="section-label">Listepriser</p>
-  {pris_seksjoner}
-
   <footer class="footer">
+    <p class="section-heading" id="kilder">Kilder</p>
+    <ul class="kilder-liste">{kilder_items}</ul>
     <p class="disclaimer">Kun offentlig tilgjengelige listepriser. Lån og finansiering fastsettes individuelt og er ikke inkludert. Plasseringskonto+ krever typisk minimum 1 million i innskudd.</p>
-    <div class="kilder">
-      <strong>Kilder</strong>
-      <ul>{kilder_items}</ul>
-    </div>
   </footer>
 
 </div>

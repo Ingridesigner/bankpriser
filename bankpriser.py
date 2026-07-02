@@ -769,7 +769,7 @@ async def main():
         for bank, antall, minimum in rad_advarsler:
             print(f"   For få rader: {bank} — {antall} funnet, forventet minst {minimum}")
             slack_linjer.append(f"• {bank}: bare {antall} rader lest (forventet minst {minimum})")
-        send_slack("⚠️ *Bankpriser — endringer oppdaget*\n" + "\n".join(slack_linjer))
+        send_slack("🏦 *Bankpriser — endringer oppdaget*\n" + "\n".join(slack_linjer))
     else:
         print("\n✅ Ingen endringer oppdaget.")
 

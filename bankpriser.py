@@ -772,10 +772,10 @@ async def main():
             print(f"   For få rader: {bank} — {antall} funnet, forventet minst {minimum}")
             slack_linjer.append(f"• {bank}: bare {antall} rader lest (forventet minst {minimum})")
         slack_linjer.append(f"<{url}|Se oppdatert prisoversikt>")
-        send_slack("🏦 *Bankpriser — endringer oppdaget*\n" + "\n".join(slack_linjer))
+        send_slack("🏦 *Endringer oppdaget*\n" + "\n".join(slack_linjer))
     else:
         print("\n✅ Ingen endringer oppdaget.")
-        send_slack(f"✅ *Bankpriser* — ingen endringer denne uken. <{url}|Se prisoversikt>")
+        send_slack(f"✅ Ingen endringer denne uken. <{url}|Se prisoversikt>")
 
     html = lag_html(alle_priser, advarsler, rad_advarsler)
     OUTPUT_FILE.write_text(html, encoding="utf-8")

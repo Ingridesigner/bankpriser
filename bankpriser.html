@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Priser bedriftsbank</title>
+<style>
+  :root {
+    --ground:    #f8f7f4;
+    --surface:   #ffffff;
+    --ink:       #1c1c1a;
+    --ink-mid:   #4a4a46;
+    --ink-light: #6e6e68;
+    --rule:      #dedad4;
+    --rule-dark: #b8b4ac;
+    --detail-bg: #fbfaf8;
+    --radius:    3px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .page { max-width: 820px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+  .masthead { border-top: 2px solid var(--ink); padding-top: .75rem; margin-bottom: 2.5rem; }
+  .masthead h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.75rem; font-weight: 700; letter-spacing: -.02em;
+    color: var(--ink); text-wrap: balance; margin-bottom: .2rem;
+  }
+  .masthead .dateline { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-light); }
+  .section-label {
+    font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-light); margin: 2.5rem 0 .9rem; padding-bottom: .4rem; border-bottom: 1px solid var(--rule);
+  }
+  .summary-wrap { overflow-x: auto; }
+  table.summary {
+    width: 100%; border-collapse: collapse; font-size: 0.97rem;
+    font-variant-numeric: tabular-nums; table-layout: fixed;
+  }
+  table.summary col.col-name { width: 40%; }
+  table.summary col.col-bank { width: 15%; }
+  table.summary thead th {
+    text-align: right; font-size: .65rem; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--ink-light);
+    padding: .5rem .6rem .5rem 0; border-bottom: 1px solid var(--rule-dark); white-space: nowrap;
+  }
+  table.summary thead th:first-child { text-align: left; padding-left: 0; }
+  table.summary thead th:not(:first-child) { color: var(--ink); }
+  tr.summary-row { cursor: pointer; }
+  tr.summary-row td {
+    padding: .7rem .6rem .7rem 0; border-bottom: 1px solid var(--rule);
+    vertical-align: middle; text-align: right; color: var(--ink-mid); transition: background .1s;
+  }
+  tr.summary-row td:first-child { text-align: left; color: var(--ink); padding-left: .75rem; }
+  tr.summary-row:hover td { background: #f0ede8; }
+  tr.summary-row.open td { border-bottom: none; background: var(--surface); }
+  .scenario-name {
+    font-family: Georgia, "Times New Roman", serif; font-weight: 600;
+    color: var(--ink); display: inline-flex; align-items: center; gap: .5rem;
+  }
+  .scenario-name svg { flex-shrink: 0; width: 16px; height: 16px; position: relative; top: -1px; }
+  .toggle-icon {
+    display: inline-block; font-size: .935rem; color: var(--ink-mid); margin-left: .4rem;
+    transition: transform .2s; vertical-align: middle; line-height: 1; position: relative; top: -2px;
+  }
+  tr.summary-row.open .toggle-icon { transform: rotate(180deg); }
+  tr.detail-row { display: none; }
+  tr.detail-row.open { display: table-row; }
+  tr.detail-row td {
+    padding: .45rem .6rem .45rem 0; text-align: right; color: var(--ink-mid);
+    border-bottom: 1px solid var(--rule); background: var(--detail-bg);
+    white-space: nowrap; font-size: .8rem;
+  }
+  tr.detail-row td:first-child { text-align: left; color: var(--ink); white-space: normal; padding-left: .75rem; }
+  .dash { color: var(--rule-dark); }
+  .prisseksjon {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: .85rem;
+  }
+  .prisseksjon-header {
+    padding: .5rem .75rem; border-bottom: 1px solid var(--rule);
+    font-size: .72rem; font-weight: 700; letter-spacing: .03em;
+    color: var(--ink-mid); background: var(--ground);
+  }
+  .prisseksjon .table-wrap { overflow-x: auto; }
+  .prisseksjon table {
+    width: 100%; border-collapse: collapse; font-size: .8rem; font-variant-numeric: tabular-nums;
+  }
+  .prisseksjon thead th {
+    background: var(--surface); border-bottom: 1px solid var(--rule); padding: .35rem .75rem;
+    text-align: right; font-size: .65rem; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--ink-mid); white-space: nowrap;
+  }
+  .prisseksjon thead th:first-child { text-align: left; }
+  .prisseksjon td { padding: .37rem .75rem; border-bottom: 1px solid var(--rule); text-align: right; color: var(--ink-mid); }
+  .prisseksjon td:first-child { text-align: left; color: var(--ink); }
+  .prisseksjon tr:last-child td { border-bottom: none; }
+  .forutsetninger { margin-top: .5rem; }
+  .forutsetninger ul { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
+  .forutsetninger li strong { font-weight: 700; color: var(--ink); }
+  .forutsetninger li {
+    font-size: .78rem; font-weight: 300; color: var(--ink-light);
+    padding-left: 1rem; position: relative; line-height: 1.55;
+  }
+  .forutsetninger li::before { content: "–"; position: absolute; left: 0; color: var(--ink-light); }
+  .to-kolonner { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; }
+  @media (max-width: 560px) { .to-kolonner { grid-template-columns: 1fr; } }
+  .scenario-beskrivelser dl { display: flex; flex-direction: column; gap: .75rem; }
+  .sc-def { display: block; }
+  .sc-def dt { font-weight: 600; font-size: .8rem; color: var(--ink); margin-bottom: .1rem; }
+  .sc-def dd { font-size: .8rem; font-weight: 300; color: var(--ink-light); line-height: 1.55; margin-left: 0; }
+  .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: .5rem; }
+  .footer .disclaimer { font-size: .72rem; color: var(--ink-light); line-height: 1.55; }
+  .footer .kilder { font-size: .7rem; color: var(--ink-light); }
+  .footer .kilder ul { list-style: none; display: flex; flex-wrap: wrap; gap: .15rem .75rem; margin-top: .25rem; }
+  .footer .kilder a { color: var(--ink-light); text-underline-offset: 2px; }
+  .footer .kilder a:hover { color: var(--ink); }
+  .advarsel {
+    border: 1px solid #f97316; background: #fff7ed;
+    border-radius: 3px; padding: .75rem 1rem; margin-bottom: 1.5rem; font-size: .875rem;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <h1>Priser bedriftsbank</h1>
+    <p class="dateline">Oppdatert 2. juli 2026</p>
+  </header>
+
+  
+
+  <div class="summary-wrap">
+    <table class="summary">
+      <colgroup>
+        <col class="col-name">
+        <col class="col-bank"><col class="col-bank"><col class="col-bank"><col class="col-bank">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Eksempelkunde</th>
+          <th>Folio</th><th>DNB</th><th>SB1 SMN</th><th>SB1 Øst</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="summary-row" data-target="detail-a"><td><span class="scenario-name"><svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 10C13.2091 10 15 8.20914 15 6C15 3.79086 13.2091 2 11 2C8.79086 2 7 3.79086 7 6C7 8.20914 8.79086 10 11 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.08 13L12.414 14.6228C11.6301 15.3863 10.3781 15.3781 9.60427 14.6043L8 13H7.92C6.88035 13 5.88328 13.413 5.14814 14.1481C4.413 14.8833 4 15.8804 4 16.92V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V16.92C18 15.8804 17.587 14.8833 16.8519 14.1481C16.1167 13.413 15.1196 13 14.08 13Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Mikro uten integrasjon</span><span class="toggle-icon">▾</span></td><td>89</td><td>55</td><td>62</td><td>175</td></tr>
+<tr class="detail-row" id="detail-a-1"><td>Månedspris/nettbank</td><td>89</td><td>0</td><td>0</td><td>120</td></tr>
+<tr class="detail-row" id="detail-a-2"><td>Integrasjon</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td></tr>
+<tr class="detail-row" id="detail-a-3"><td>Kort (årsavgift÷12)</td><td>inkl.</td><td>25</td><td>17</td><td>25</td></tr>
+<tr class="detail-row" id="detail-a-4"><td>Utbetalinger (3 stk)</td><td>inkl.</td><td>5</td><td>5</td><td>5</td></tr>
+<tr class="detail-row" id="detail-a-5"><td>Kortbruk (10 kjøp)</td><td>inkl.</td><td>25</td><td>40</td><td>25</td></tr>
+<tr class="summary-row" data-target="detail-b"><td><span class="scenario-name"><svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5.99998" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12H19V17C19 18.1045 18.1046 19 17 19H5C3.89543 19 3 18.1045 3 17V12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.9866 3.29785C13.6939 2.51721 12.9477 2.00004 12.114 2.00004H9.88605C9.05233 2.00004 8.30608 2.51721 8.01337 3.29785L7 6.0004H15L13.9866 3.29785Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 10.0003V14.0003" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Typisk driftskunde</span><span class="toggle-icon">▾</span></td><td>159</td><td>236</td><td>406</td><td>386</td></tr>
+<tr class="detail-row" id="detail-b-1"><td>Månedspris/nettbank</td><td>159</td><td>0</td><td>0</td><td>300</td></tr>
+<tr class="detail-row" id="detail-b-2"><td>Integrasjon</td><td>inkl.</td><td>150</td><td>300</td><td>inkl. i 300</td></tr>
+<tr class="detail-row" id="detail-b-3"><td>Kort (årsavgift÷12)</td><td>inkl.</td><td>25</td><td>17</td><td>25</td></tr>
+<tr class="detail-row" id="detail-b-4"><td>Utbetalinger (6 stk)</td><td>inkl.</td><td>11</td><td>9</td><td>11</td></tr>
+<tr class="detail-row" id="detail-b-5"><td>Kortbruk (20 kjøp)</td><td>inkl.</td><td>50</td><td>80</td><td>50</td></tr>
+<tr class="summary-row" data-target="detail-c"><td><span class="scenario-name"><svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.0001 20H3.00012C2.44784 20 2.00012 19.5523 2.00012 19V3C2.00012 2.44772 2.44784 2 3.00012 2H14.0001C14.5524 2 15.0001 2.44772 15.0001 3V8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 8H12C11.4477 8 11 8.44772 11 9V19C11 19.5523 11.4477 20 12 20H18C18.5523 20 19 19.5523 19 19V9C19 8.44772 18.5523 8 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 12H16" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 16H16" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5.00012 6H7.00012" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5.00012 10H7.00012" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5.00012 14H7.00012" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Vekstkunde</span><span class="toggle-icon">▾</span></td><td>458</td><td>471</td><td>718</td><td>655</td></tr>
+<tr class="detail-row" id="detail-c-1"><td>Månedspris/nettbank</td><td>359</td><td>0</td><td>0</td><td>300</td></tr>
+<tr class="detail-row" id="detail-c-2"><td>Integrasjon</td><td>inkl.</td><td>150</td><td>300</td><td>inkl. i 300</td></tr>
+<tr class="detail-row" id="detail-c-3"><td>Ekstra bruker</td><td>inkl.</td><td>45</td><td>50</td><td>40</td></tr>
+<tr class="detail-row" id="detail-c-4"><td>2 kort (årsavgift÷12)</td><td>inkl.</td><td>50</td><td>33</td><td>50</td></tr>
+<tr class="detail-row" id="detail-c-5"><td>1 ekstra kort (Folio)</td><td>89</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td></tr>
+<tr class="detail-row" id="detail-c-6"><td>Utbetalinger (20 stk)</td><td>inkl.</td><td>0</td><td>30</td><td>35</td></tr>
+<tr class="detail-row" id="detail-c-7"><td>KID-abonnement</td><td class="dash">—</td><td>90</td><td>95</td><td>95</td></tr>
+<tr class="detail-row" id="detail-c-8"><td>KID-innbet. (5 stk)</td><td>10</td><td>11</td><td>10</td><td>10</td></tr>
+<tr class="detail-row" id="detail-c-9"><td>Kortbruk (50 kjøp)</td><td>inkl.</td><td>125</td><td>200</td><td>125</td></tr>
+<tr class="summary-row" data-target="detail-d"><td><span class="scenario-name"><svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.6257 4.25097L9.8174 4.83977C10.0677 5.18336 10.5078 5.33116 10.9148 5.20827L10.6257 4.25097ZM5.99996 2.49999L5.75742 1.52985C5.49995 1.59422 5.27863 1.75829 5.1422 1.98593C5.00577 2.21358 4.96543 2.48611 5.03006 2.74352L5.99996 2.49999ZM13.289 3.97064L13.4168 2.97884V2.97884L13.289 3.97064ZM19.8006 9.08591L20.7771 8.87033V8.87033L19.8006 9.08591ZM16.7195 16.9542L16.201 16.0991C15.902 16.2804 15.7195 16.6046 15.7195 16.9542H16.7195ZM13.6406 18H14.6406C14.6406 17.4477 14.1929 17 13.6406 17V18ZM10.6748 18V17C10.1225 17 9.67477 17.4477 9.67477 18H10.6748ZM7.70893 18.9999H6.70893V18.9999H7.70893ZM7.70893 16.9542H8.70893C8.70893 16.5094 8.41511 16.118 7.98796 15.9939L7.70893 16.9542ZM4.01233 13L4.94998 12.6524C4.80462 12.2603 4.43056 12 4.01233 12V13ZM4.32993 9V10C4.72334 10 5.08019 9.76933 5.24173 9.41062L4.32993 9ZM6.84617 5.87023L7.38367 6.71349C7.74672 6.48208 7.92091 6.04428 7.81606 5.62671L6.84617 5.87023ZM10.6257 4.25097L11.434 3.66217C10.3422 2.1634 8.91233 1.62112 7.77935 1.46279C7.21924 1.38452 6.72863 1.39861 6.37589 1.43223C6.19858 1.44913 6.05333 1.47123 5.94819 1.49015C5.89553 1.49962 5.85268 1.50834 5.82062 1.51528C5.80458 1.51875 5.79121 1.52179 5.78065 1.52426C5.77536 1.52549 5.77078 1.52658 5.7669 1.52752C5.76496 1.52799 5.7632 1.52842 5.76162 1.52881C5.76083 1.529 5.76009 1.52919 5.75939 1.52936C5.75904 1.52945 5.75854 1.52957 5.75837 1.52961C5.75789 1.52973 5.75742 1.52985 5.99996 2.49999C6.24249 3.47014 6.24205 3.47025 6.24161 3.47036C6.24148 3.47039 6.24105 3.47049 6.24079 3.47056C6.24026 3.47069 6.23977 3.47081 6.23933 3.47092C6.23843 3.47114 6.2377 3.47132 6.23714 3.47146C6.236 3.47173 6.2355 3.47185 6.23564 3.47181C6.2359 3.47175 6.23867 3.47111 6.24383 3.46999C6.25416 3.46775 6.27394 3.46365 6.30228 3.45855C6.35912 3.44833 6.44929 3.4343 6.56567 3.4232C6.8003 3.40084 7.13019 3.39151 7.50255 3.44355C8.23453 3.54583 9.11756 3.87905 9.8174 4.83977L10.6257 4.25097ZM13.289 3.97064L13.4168 2.97884C12.3207 2.83762 11.2895 3.00591 10.3366 3.29367L10.6257 4.25097L10.9148 5.20827C11.6946 4.97276 12.4303 4.86828 13.1612 4.96245L13.289 3.97064ZM19.8006 9.08591L20.7771 8.87033C19.9799 5.2596 16.5413 3.38142 13.4168 2.97884L13.289 3.97064L13.1612 4.96245C15.8512 5.30904 18.2829 6.85019 18.8241 9.3015L19.8006 9.08591ZM16.7195 16.9542L17.238 17.8093C18.993 16.7451 21.8189 13.5894 20.7771 8.87033L19.8006 9.08591L18.8241 9.3015C19.6288 12.9462 17.4564 15.3378 16.201 16.0991L16.7195 16.9542ZM16.7195 18.9999H17.7195V16.9542H16.7195H15.7195V18.9999H16.7195ZM15.7195 19.9999V20.9999C16.824 20.9999 17.7195 20.1045 17.7195 18.9999H16.7195H15.7195V19.9999ZM14.6406 19.9999V20.9999H15.7195V19.9999V18.9999H14.6406V19.9999ZM13.6406 18.9999H12.6406C12.6406 20.1045 13.536 20.9999 14.6406 20.9999V19.9999V18.9999H14.6406H13.6406ZM13.6406 18H12.6406V18.9999H13.6406H14.6406V18H13.6406ZM10.6748 18V19H13.6406V18V17H10.6748V18ZM10.6748 18.9999H11.6748V18H10.6748H9.67477V18.9999H10.6748ZM9.67477 19.9999V20.9999C10.7793 20.9999 11.6748 20.1045 11.6748 18.9999H10.6748H9.67477H9.67477V19.9999ZM8.70893 19.9999V20.9999H9.67477V19.9999V18.9999H8.70893V19.9999ZM7.70893 18.9999H6.70893C6.70893 20.1045 7.60436 20.9999 8.70893 20.9999V19.9999V18.9999H8.70893H7.70893ZM7.70893 16.9542H6.70893V18.9999H7.70893H8.70893V16.9542H7.70893ZM4.01233 13L3.07467 13.3476C3.43566 14.3214 4.04976 15.3077 4.78372 16.1163C5.50767 16.9139 6.42524 17.6225 7.4299 17.9145L7.70893 16.9542L7.98796 15.9939C7.46963 15.8433 6.85177 15.4189 6.26461 14.7721C5.68746 14.1362 5.21476 13.3667 4.94998 12.6524L4.01233 13ZM4.01233 13V12H3V13V14H4.01233V13ZM3 13V12H2H1C1 13.1046 1.89543 14 3 14V13ZM2 12H3V10H2H1V12H2ZM2 10H3V9V8C1.89543 8 1 8.89543 1 10H2ZM3 9V10H4.32993V9V8H3V9ZM6.84617 5.87023L6.30867 5.02697C5.14985 5.76561 4.0754 7.12986 3.41812 8.58937L4.32993 9L5.24173 9.41062C5.78199 8.21097 6.63158 7.19288 7.38367 6.71349L6.84617 5.87023ZM5.99996 2.49999L5.03006 2.74352L5.87627 6.11376L6.84617 5.87023L7.81606 5.62671L6.96985 2.25647L5.99996 2.49999Z" fill="currentColor"/><circle cx="8" cy="9.99998" r="0.5" stroke="currentColor"/></svg>Inaktiv holding</span><span class="toggle-icon">▾</span></td><td>89</td><td>0</td><td>0</td><td>120</td></tr>
+<tr class="detail-row" id="detail-d-1"><td>Månedspris/nettbank</td><td>89</td><td>0</td><td>0</td><td>120</td></tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="to-kolonner">
+    <div>
+      <p class="section-label">Om scenariene</p>
+      <div class="scenario-beskrivelser">
+        <dl><div class="sc-def"><dt>Mikro uten integrasjon</dt><dd>ENK eller liten AS med minimal aktivitet. Ingen KID-fakturering, ingen integrasjon. Tre utbetalinger per måned, ett bedriftskort med ti varekjøp.</dd></div>
+<div class="sc-def"><dt>Typisk driftskunde</dt><dd>Aktiv AS som bruker eksternt regnskapssystem (Tripletex, Fiken e.l.). Seks utbetalinger per måned, ett kort med tjue varekjøp og integrasjon.</dd></div>
+<div class="sc-def"><dt>Vekstkunde</dt><dd>Mer aktiv bedrift. Bruker KID-fakturering og integrasjon. Tjue utbetalinger og fem KID-innbetalinger per måned, to bedriftskort med femti varekjøp, og én ekstra nettbankbruker.</dd></div>
+<div class="sc-def"><dt>Inaktiv holding</dt><dd>Ingen kortbruk og null transaksjoner. Viser minimumskostnaden for å holde en konto åpen.</dd></div>
+</dl>
+      </div>
+    </div>
+    <div>
+      <p class="section-label">Forutsetninger</p>
+      <div class="forutsetninger">
+        <ul><li><strong>DNB bundle vs standalone:</strong> Bundle (69 kr/mnd) inkluderer 3 brukere, 30 utbet./mnd med KID, 30 lønnsutbet. og Visa Business-kortavgift. Brukes kun der det er billigere enn standalone. Integrasjon mot regnskapssystem (150 kr/mnd) er alltid et separat tillegg.</li><li><strong>SB1 Østlandet nettbank + integrasjon:</strong> 300 kr/mnd er totalpris med filoverføring/integrasjon — ikke 120 + 300. Du velger enten 120 kr (uten) eller 300 kr (med).</li><li><strong>KID-abonnement:</strong> DNB og SB1 tar 90–95 kr/mnd i abonnementsavgift for KID-innbetalingsmottak, i tillegg til per-transaksjonsprisen. Folio har ingen slik abonnementsavgift.</li><li><strong>Kortavgift:</strong> DNB og SB1 tar 200–295 kr/år per bedriftskort (÷12 i beregningene). Folio inkluderer ett kort; ekstra kort koster 89 kr/mnd kun ved bruk.</li><li><strong>Varekjøp med kort:</strong> DNB 2,50 kr, SB1 SMN 4 kr, SB1 Østlandet 2,50 kr, Folio 0 kr.</li><li><strong>Ikke inkludert:</strong> Renter på innskudd (se pristabell nedenfor), internasjonale betalinger, AvtaleGiro, terminaler og andre spesialtjenester.</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-label">Listepriser</p>
+  <div class="prisseksjon"><div class="prisseksjon-header">Kontohold og daglig bruk</div><div class="table-wrap"><table><thead><tr><th>Tjeneste</th><th>Folio</th><th>DNB</th><th>SB1 SMN</th><th>SB1 Øst</th></tr></thead><tbody><tr><td>Nettbank uten integrasjon (kr/mnd)</td><td>89–359</td><td>0,00</td><td>0</td><td>120</td></tr>
+<tr><td>Nettbank bundle (kr/mnd)</td><td class="dash">—</td><td>69,00</td><td class="dash">—</td><td class="dash">—</td></tr>
+<tr><td>Integrasjon (kr/mnd)</td><td>inkl.</td><td>150,00</td><td>300</td><td>300</td></tr>
+<tr><td>Debitkort Visa årspris</td><td>inkl.</td><td>295,00</td><td>200</td><td>295</td></tr>
+<tr><td>Kortgebyr per kjøp</td><td>0</td><td>2,50</td><td>4</td><td>2,50</td></tr>
+</tbody></table></div></div>
+<div class="prisseksjon"><div class="prisseksjon-header">Betalingstjenester — kr per transaksjon</div><div class="table-wrap"><table><thead><tr><th>Tjeneste</th><th>Folio</th><th>DNB</th><th>SB1 SMN</th><th>SB1 Øst</th></tr></thead><tbody><tr><td>Utbetaling m/KID (kr)</td><td>inkl.</td><td>1,75</td><td>1,50</td><td>1,75</td></tr>
+<tr><td>Lønnskjøring (kr)</td><td>inkl.</td><td>2,00</td><td>1,75</td><td>2</td></tr>
+<tr><td>eFaktura per faktura (kr)</td><td>2</td><td>8,00</td><td>3,50</td><td>8,00</td></tr>
+</tbody></table></div></div>
+<div class="prisseksjon"><div class="prisseksjon-header">Rentebetingelser</div><div class="table-wrap"><table><thead><tr><th>Tjeneste</th><th>Folio</th><th>DNB</th><th>SB1 SMN</th><th>SB1 Øst</th></tr></thead><tbody><tr><td>Driftskonto rente</td><td class="dash">—</td><td>0,00 %</td><td>0,00 %</td><td>0,00 %</td></tr>
+<tr><td>Klientkonto rente</td><td class="dash">—</td><td>3,15%</td><td>2,50 %</td><td>3,15 %</td></tr>
+<tr><td>Plasseringskonto (standard)</td><td class="dash">—</td><td>3,20 %</td><td>2,75 %</td><td>3,05 %</td></tr>
+<tr><td>Plasseringskonto+ (1M+)</td><td class="dash">—</td><td class="dash">—</td><td>4,00 %</td><td>4,55 %</td></tr>
+<tr><td>Depositumskonto rente</td><td class="dash">—</td><td class="dash">—</td><td>1,00 %</td><td>2,00 %</td></tr>
+<tr><td>Fastrente 6 mnd</td><td class="dash">—</td><td>4,65 % per år</td><td>4,90 %</td><td>4,80 %</td></tr>
+<tr><td>Fastrente 12 mnd</td><td class="dash">—</td><td>4,70 % per år</td><td>4,70 %</td><td>4,65 %</td></tr>
+</tbody></table></div></div>
+
+
+  <footer class="footer">
+    <p class="disclaimer">Kun offentlig tilgjengelige listepriser. Lån og finansiering fastsettes individuelt og er ikke inkludert. Plasseringskonto+ krever typisk minimum 1 million i innskudd.</p>
+    <div class="kilder">
+      <strong>Kilder</strong>
+      <ul><li><a href="https://www.dnb.no/bedrift/dagligbank/konto/prisliste" target="_blank">DNB</a></li><li><a href="https://www.dnb.no/bedrift/dagligbank/prisliste" target="_blank">DNB</a></li><li><a href="https://www.dnb.no/bedrift/dagligbank/kort/prisliste" target="_blank">DNB</a></li><li><a href="https://www.dnb.no/bedrift/dagligbank/betaling/prisliste" target="_blank">DNB</a></li><li><a href="https://www.sparebank1.no/nb/smn/bedrift/kundeservice/bestill/prisliste.html" target="_blank">SB1 SMN</a></li><li><a href="https://www.sparebank1.no/nb/ostlandet/bedrift/kundeservice/bestill/prisliste.html" target="_blank">SB1 Østlandet</a></li></ul>
+    </div>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('tr.summary-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var prefix = row.dataset.target;
+      var isOpen = row.classList.contains('open');
+      if (isOpen) {
+        row.classList.remove('open');
+        document.querySelectorAll('tr.detail-row[id^="' + prefix + '-"]').forEach(function(d) {
+          d.classList.remove('open');
+        });
+      } else {
+        row.classList.add('open');
+        document.querySelectorAll('tr.detail-row[id^="' + prefix + '-"]').forEach(function(d) {
+          d.classList.add('open');
+        });
+      }
+    });
+  });
+</script>
+</body>
+</html>

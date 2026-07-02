@@ -14,8 +14,10 @@ Kjør:
 
 import asyncio
 import json
+import os
 import re
 import sys
+import urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -220,6 +222,14 @@ def last_snapshot():
 def lagre_snapshot(alle_priser):
     data = {p["bank"]: {k: v for k, v in p.items() if k != "bank"} for p in alle_priser}
     SNAPSHOT_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+def send_slack(melding):
+    url = os.environ.get("SLACK_WEBHOOK_URL")
+    if not url:
+        return
+    data = json.dumps({"text": melding}).encode()
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=10)
 
 def finn_advarsler(alle_priser, snapshot):
     """
@@ -746,10 +756,14 @@ async def main():
 
     if advarsler or rad_advarsler:
         print("\n⚠️  VARSLER:")
+        linjer = []
         for bank, felt, gammel in advarsler:
             print(f"   Felt forsvant: {bank} / {felt}  (forrige: {gammel})")
+            linjer.append(f"• {bank}: *{felt}* ikke funnet (forrige: {gammel})")
         for bank, antall, minimum in rad_advarsler:
             print(f"   For få rader: {bank} — {antall} funnet, forventet minst {minimum}")
+            linjer.append(f"• {bank}: bare {antall} rader lest (forventet minst {minimum})")
+        send_slack("⚠️ *Bankpriser — mulige prisendringer*\n" + "\n".join(linjer))
     else:
         print("\n✅ Ingen leseproblemer oppdaget.")
 

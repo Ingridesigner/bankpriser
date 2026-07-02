@@ -232,11 +232,8 @@ def send_slack(melding):
     urllib.request.urlopen(req, timeout=10)
 
 def finn_advarsler(alle_priser, snapshot):
-    """
-    Returner liste av (bank, felt, gammel_verdi) for felt som hadde
-    en verdi forrige kjøring men nå er tomme.
-    """
     advarsler = []
+    endringer = []
     for p in alle_priser:
         bank = p["bank"]
         forrige = snapshot.get(bank, {})
@@ -246,7 +243,9 @@ def finn_advarsler(alle_priser, snapshot):
             gammel = forrige.get(felt)
             if gammel and not verdi:
                 advarsler.append((bank, felt, gammel))
-    return advarsler
+            elif gammel and verdi and normaliser_verdi(gammel) != normaliser_verdi(verdi):
+                endringer.append((bank, felt, gammel, verdi))
+    return advarsler, endringer
 
 # ---------------------------------------------------------------------------
 # Markdown-output
@@ -743,7 +742,7 @@ async def main():
 
     # Varsling
     snapshot = last_snapshot()
-    advarsler = finn_advarsler(alle_priser, snapshot)
+    advarsler, endringer = finn_advarsler(alle_priser, snapshot)
 
     # Legg til rad-advarsler fra parsing
     rad_advarsler = []
@@ -754,18 +753,25 @@ async def main():
         if antall < min_rader:
             rad_advarsler.append((bank, antall, min_rader))
 
-    if advarsler or rad_advarsler:
-        print("\n⚠️  VARSLER:")
-        linjer = []
+    if endringer:
+        print("\n📊  PRISENDRINGER:")
+        for bank, felt, gammel, ny in endringer:
+            print(f"   {bank} / {felt}: {gammel} → {ny}")
+
+    if advarsler or rad_advarsler or endringer:
+        print("\n⚠️  VARSLER:" if advarsler or rad_advarsler else "")
+        slack_linjer = []
+        for bank, felt, gammel, ny in endringer:
+            slack_linjer.append(f"• {bank}: *{felt}* endret fra {gammel} til *{ny}*")
         for bank, felt, gammel in advarsler:
             print(f"   Felt forsvant: {bank} / {felt}  (forrige: {gammel})")
-            linjer.append(f"• {bank}: *{felt}* ikke funnet (forrige: {gammel})")
+            slack_linjer.append(f"• {bank}: *{felt}* ikke funnet (forrige: {gammel})")
         for bank, antall, minimum in rad_advarsler:
             print(f"   For få rader: {bank} — {antall} funnet, forventet minst {minimum}")
-            linjer.append(f"• {bank}: bare {antall} rader lest (forventet minst {minimum})")
-        send_slack("⚠️ *Bankpriser — mulige prisendringer*\n" + "\n".join(linjer))
+            slack_linjer.append(f"• {bank}: bare {antall} rader lest (forventet minst {minimum})")
+        send_slack("⚠️ *Bankpriser — endringer oppdaget*\n" + "\n".join(slack_linjer))
     else:
-        print("\n✅ Ingen leseproblemer oppdaget.")
+        print("\n✅ Ingen endringer oppdaget.")
 
     html = lag_html(alle_priser, advarsler, rad_advarsler)
     OUTPUT_FILE.write_text(html, encoding="utf-8")

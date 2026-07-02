@@ -50,6 +50,18 @@ MINIMUM_RADER = {"DNB": 30, "SB1 SMN": 50, "SB1 Østlandet": 50}
 def rens(s):
     return re.sub(r"\s+", " ", s.replace("\xa0", " ")).strip()
 
+def til_float(s):
+    """Konverter prisstreng til float: '2,50', '4 kr per kjøp', '295,-' -> tall."""
+    if not s:
+        return 0.0
+    s = normaliser_verdi(s) or ""
+    m = re.search(r'\d+[,.]?\d*', s)
+    return float(m.group().replace(',', '.')) if m else 0.0
+
+def kr(v):
+    """Rund til nærmeste heltall og returner som streng."""
+    return str(int(round(v)))
+
 def normaliser_verdi(v):
     """Fjern enhet-tekst: '1,75 kr', '2,-', 'kr 80' -> '1,75', '2', '80'.
     Beholder interne mellomrom slik at '4,65 % per ar' ikke smelter sammen."""
@@ -283,6 +295,11 @@ BANK_DISPLAY = {
     "SB1 Østlandet": "SB1 Øst",
 }
 
+# Priser som ikke scrapes — oppdater manuelt ved behov
+EKSTRA_BRUKER_PRIS  = {"DNB": 45, "SB1 SMN": 50, "SB1 Østlandet": 40}
+KID_ABO_PRIS        = {"DNB": 90, "SB1 SMN": 95, "SB1 Østlandet": 95}
+KID_INNBET_PRIS_STK = {"DNB": 2.2, "SB1 SMN": 2.0, "SB1 Østlandet": 2.0}
+
 IKONER = {
     "person": (
         '<svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">'
@@ -323,58 +340,196 @@ SCENARIOER = [
         "tittel": "Mikro uten integrasjon",
         "icon": "person",
         "beskrivelse": "ENK eller liten AS med minimal aktivitet. Ingen KID-fakturering, ingen integrasjon. Tre utbetalinger per måned, ett bedriftskort med ti varekjøp.",
-        "rader": [
-            ("Månedspris/nettbank",    ["89",    "0",    "0",    "120"]),
-            ("Integrasjon",            ["—",     "—",    "—",    "—"]),
-            ("Kort (årsavgift÷12)",    ["inkl.", "25",   "17",   "25"]),
-            ("Utbetalinger (3 stk)",   ["inkl.", "5",    "5",    "5"]),
-            ("Kortbruk (10 kjøp)",     ["inkl.", "25",   "40",   "25"]),
-        ],
-        "totaler": ["89", "55", "62", "175"],
+        "folio": {"nettbank": "89", "total": 89},
+        "aktivitet": {
+            "med_integrasjon": False,
+            "antall_utbetalinger": 3,
+            "antall_kort": 1,
+            "antall_kortbruk": 10,
+            "ekstra_brukere": False,
+            "ekstra_folio_kort": False,
+            "har_kid_abonnement": False,
+            "antall_kid_innbet": 0,
+            "folio_kid_innbet": None,
+        },
     },
     {
         "id": "b",
         "tittel": "Typisk driftskunde",
         "icon": "briefcase",
         "beskrivelse": "Aktiv AS som bruker eksternt regnskapssystem (Tripletex, Fiken e.l.). Seks utbetalinger per måned, ett kort med tjue varekjøp og integrasjon.",
-        "rader": [
-            ("Månedspris/nettbank",    ["159",   "0",    "0",    "300"]),
-            ("Integrasjon",            ["inkl.", "150",  "300",  "inkl. i 300"]),
-            ("Kort (årsavgift÷12)",    ["inkl.", "25",   "17",   "25"]),
-            ("Utbetalinger (6 stk)",   ["inkl.", "11",   "9",    "11"]),
-            ("Kortbruk (20 kjøp)",     ["inkl.", "50",   "80",   "50"]),
-        ],
-        "totaler": ["159", "236", "406", "386"],
+        "folio": {"nettbank": "159", "total": 159},
+        "aktivitet": {
+            "med_integrasjon": True,
+            "antall_utbetalinger": 6,
+            "antall_kort": 1,
+            "antall_kortbruk": 20,
+            "ekstra_brukere": False,
+            "ekstra_folio_kort": False,
+            "har_kid_abonnement": False,
+            "antall_kid_innbet": 0,
+            "folio_kid_innbet": None,
+        },
     },
     {
         "id": "c",
         "tittel": "Vekstkunde",
         "icon": "building",
         "beskrivelse": "Mer aktiv bedrift. Bruker KID-fakturering og integrasjon. Tjue utbetalinger og fem KID-innbetalinger per måned, to bedriftskort med femti varekjøp, og én ekstra nettbankbruker.",
-        "rader": [
-            ("Månedspris/nettbank",    ["359",   "0",    "0",    "300"]),
-            ("Integrasjon",            ["inkl.", "150",  "300",  "inkl. i 300"]),
-            ("Ekstra bruker",          ["inkl.", "45",   "50",   "40"]),
-            ("2 kort (årsavgift÷12)",  ["inkl.", "50",   "33",   "50"]),
-            ("1 ekstra kort (Folio)",  ["89",    "—",    "—",    "—"]),
-            ("Utbetalinger (20 stk)",  ["inkl.", "0",    "30",   "35"]),
-            ("KID-abonnement",         ["—",     "90",   "95",   "95"]),
-            ("KID-innbet. (5 stk)",    ["10",    "11",   "10",   "10"]),
-            ("Kortbruk (50 kjøp)",     ["inkl.", "125",  "200",  "125"]),
-        ],
-        "totaler": ["458", "471", "718", "655"],
+        "folio": {"nettbank": "359", "total": 458},
+        "aktivitet": {
+            "med_integrasjon": True,
+            "antall_utbetalinger": 20,
+            "antall_kort": 2,
+            "antall_kortbruk": 50,
+            "ekstra_brukere": True,
+            "ekstra_folio_kort": True,
+            "har_kid_abonnement": True,
+            "antall_kid_innbet": 5,
+            "folio_kid_innbet": "10",
+        },
     },
     {
         "id": "d",
         "tittel": "Inaktiv holding",
         "icon": "piggybank",
         "beskrivelse": "Ingen kortbruk og null transaksjoner. Viser minimumskostnaden for å holde en konto åpen.",
-        "rader": [
-            ("Månedspris/nettbank",    ["89",    "0",    "0",    "120"]),
-        ],
-        "totaler": ["89", "0", "0", "120"],
+        "folio": {"nettbank": "89", "total": 89},
+        "aktivitet": {
+            "med_integrasjon": False,
+            "antall_utbetalinger": 0,
+            "antall_kort": 0,
+            "antall_kortbruk": 0,
+            "ekstra_brukere": False,
+            "ekstra_folio_kort": False,
+            "har_kid_abonnement": False,
+            "antall_kid_innbet": 0,
+            "folio_kid_innbet": None,
+        },
     },
 ]
+
+
+def _folio_rader(s):
+    """Generer Folio-kolonne rader fra scenario-definisjon."""
+    akt = s["aktivitet"]
+    rader = []
+    rader.append(("Månedspris/nettbank", s["folio"]["nettbank"]))
+    if akt["med_integrasjon"]:
+        rader.append(("Integrasjon", "inkl."))
+    else:
+        rader.append(("Integrasjon", "—"))
+    if akt["ekstra_brukere"]:
+        rader.append(("Ekstra bruker", "inkl."))
+    n_kort = akt["antall_kort"]
+    if n_kort > 0:
+        label = f"{n_kort} kort (årsavgift÷12)" if n_kort > 1 else "Kort (årsavgift÷12)"
+        rader.append((label, "inkl."))
+    if akt["ekstra_folio_kort"]:
+        rader.append(("1 ekstra kort (Folio)", "89"))
+    n_utbet = akt["antall_utbetalinger"]
+    if n_utbet > 0:
+        rader.append((f"Utbetalinger ({n_utbet} stk)", "inkl."))
+    if akt["har_kid_abonnement"]:
+        rader.append(("KID-abonnement", "—"))
+    n_kid = akt["antall_kid_innbet"]
+    if n_kid > 0:
+        rader.append((f"KID-innbet. ({n_kid} stk)", akt["folio_kid_innbet"] or "inkl."))
+    n_kortbruk = akt["antall_kortbruk"]
+    if n_kortbruk > 0:
+        rader.append((f"Kortbruk ({n_kortbruk} kjøp)", "inkl."))
+    return rader
+
+
+def _bank_rader(s, p):
+    """Beregn bank-kolonne rader fra scrapede priser og aktivitetsparametere."""
+    akt = s["aktivitet"]
+    bank = p["bank"]
+    med_int = akt["med_integrasjon"]
+    n_utbet = akt["antall_utbetalinger"]
+    n_kort = akt["antall_kort"]
+    n_kortbruk = akt["antall_kortbruk"]
+    n_kid = akt["antall_kid_innbet"]
+
+    rader = []
+    total = 0.0
+
+    # Nettbank + integrasjon
+    if bank == "SB1 Østlandet" and med_int:
+        nb = til_float(p.get("ERP-integrasjon (kr/mnd)"))
+        rader.append(("Månedspris/nettbank", kr(nb)))
+        rader.append(("Integrasjon", "inkl. i 300"))
+        total += nb
+    else:
+        nb = til_float(p.get("Nettbank uten integrasjon (kr/mnd)"))
+        rader.append(("Månedspris/nettbank", kr(nb)))
+        total += nb
+        if med_int:
+            int_v = til_float(p.get("ERP-integrasjon (kr/mnd)"))
+            rader.append(("Integrasjon", kr(int_v)))
+            total += int_v
+        else:
+            rader.append(("Integrasjon", "—"))
+
+    # Ekstra bruker
+    if akt["ekstra_brukere"]:
+        v = EKSTRA_BRUKER_PRIS.get(bank, 0)
+        rader.append(("Ekstra bruker", kr(v)))
+        total += v
+
+    # Kort
+    if n_kort > 0:
+        v = til_float(p.get("Debitkort Visa årspris")) / 12 * n_kort
+        label = f"{n_kort} kort (årsavgift÷12)" if n_kort > 1 else "Kort (årsavgift÷12)"
+        rader.append((label, kr(v)))
+        total += v
+
+    # Ekstra Folio-kort (andre banker viser —)
+    if akt["ekstra_folio_kort"]:
+        rader.append(("1 ekstra kort (Folio)", "—"))
+
+    # Utbetalinger
+    if n_utbet > 0:
+        v = til_float(p.get("Utbetaling m/KID (kr)")) * n_utbet
+        rader.append((f"Utbetalinger ({n_utbet} stk)", kr(v)))
+        total += v
+
+    # KID-abonnement
+    if akt["har_kid_abonnement"]:
+        v = KID_ABO_PRIS.get(bank, 0)
+        rader.append(("KID-abonnement", kr(v)))
+        total += v
+
+    # KID-innbetalinger
+    if n_kid > 0:
+        v = KID_INNBET_PRIS_STK.get(bank, 0) * n_kid
+        rader.append((f"KID-innbet. ({n_kid} stk)", kr(v)))
+        total += v
+
+    # Kortbruk
+    if n_kortbruk > 0:
+        v = til_float(p.get("Kortgebyr per kjøp")) * n_kortbruk
+        rader.append((f"Kortbruk ({n_kortbruk} kjøp)", kr(v)))
+        total += v
+
+    return rader, int(round(total))
+
+
+def beregn_scenarioer(alle_priser):
+    """Beregn scenarioverdier fra scrapede priser og aktivitetsparametere."""
+    bank_dict = {p["bank"]: p for p in alle_priser}
+    banker = ["DNB", "SB1 SMN", "SB1 Østlandet"]
+    result = []
+    for s in SCENARIOER:
+        folio_r = _folio_rader(s)
+        bank_data = [_bank_rader(s, bank_dict.get(b, {"bank": b})) for b in banker]
+        merged = []
+        for i, (label, folio_v) in enumerate(folio_r):
+            bank_vs = [bd[0][i][1] if i < len(bd[0]) else "—" for bd in bank_data]
+            merged.append((label, [folio_v] + bank_vs))
+        totaler = [str(s["folio"]["total"])] + [str(bd[1]) for bd in bank_data]
+        result.append({**s, "rader": merged, "totaler": totaler})
+    return result
 
 FORUTSETNINGER = [
     ("<strong>DNB bundle vs standalone:</strong> Bundle (69 kr/mnd) inkluderer 3 brukere, 30 utbet./mnd med KID, "
@@ -540,6 +695,7 @@ def _td_val(v):
 
 
 def lag_html(alle_priser, advarsler, rad_advarsler):
+    scenarioer = beregn_scenarioer(alle_priser)
     banker = [p["bank"] for p in alle_priser]
     alle_banker = ["Folio"] + banker
     alle_banker_display = [BANK_DISPLAY.get(b, b) for b in alle_banker]
@@ -575,7 +731,7 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
 
     # Accordion summary table
     accordion_rader = ""
-    for s in SCENARIOER:
+    for s in scenarioer:
         icon = IKONER[s["icon"]]
         totaler_html = "".join(f"<td>{t}</td>" for t in s["totaler"])
         accordion_rader += (
@@ -596,7 +752,7 @@ def lag_html(alle_priser, advarsler, rad_advarsler):
 
     # Om scenariene
     om_scenariene = ""
-    for s in SCENARIOER:
+    for s in scenarioer:
         om_scenariene += (
             f'<div class="sc-def">'
             f'<dt>{s["tittel"]}</dt>'

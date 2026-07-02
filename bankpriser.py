@@ -720,8 +720,8 @@ def _td_val(v):
 LOGO_FILER = {
     "Folio":          ("logoer/Folio icon square.png", "image/png",  -3),
     "DNB":            ("logoer/DNB_ASA.png",           "image/png",  -9),
-    "SB1 SMN":        ("logoer/spb1.jpg",              "image/jpeg", 8),
-    "SB1 Østlandet":  ("logoer/spb1.jpg",              "image/jpeg", 8),
+    "SB1 SMN":        ("logoer/spb1.png",              "image/png", 8),
+    "SB1 Østlandet":  ("logoer/spb1.png",              "image/png", 8),
 }
 
 def _logo_tag(bank):

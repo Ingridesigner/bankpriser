@@ -431,7 +431,7 @@ IKONER = {
 SCENARIOER = [
     {
         "id": "a",
-        "tittel": "Mikro uten integrasjon",
+        "tittel": "Mikro",
         "icon": "person",
         "beskrivelse": "ENK eller liten AS med minimal aktivitet. Ingen KID-fakturering, ingen integrasjon. Tre utbetalinger per måned, ett bedriftskort med ti varekjøp.",
         "dnb_asterisk": True,
@@ -450,7 +450,7 @@ SCENARIOER = [
     },
     {
         "id": "b",
-        "tittel": "Typisk driftskunde",
+        "tittel": "Typisk drift",
         "icon": "briefcase",
         "beskrivelse": "Aktiv AS som bruker eksternt regnskapssystem (Tripletex, Fiken e.l.). Seks utbetalinger per måned, ett kort med tjue varekjøp og integrasjon.",
         "folio": {"nettbank": "159", "total": 159},
@@ -486,7 +486,7 @@ SCENARIOER = [
     },
     {
         "id": "d",
-        "tittel": "Inaktiv holding",
+        "tittel": "Inaktiv",
         "icon": "piggybank",
         "beskrivelse": "Ingen kortbruk og null transaksjoner. Viser minimumskostnaden for å holde en konto åpen.",
         "dnb_asterisk": True,

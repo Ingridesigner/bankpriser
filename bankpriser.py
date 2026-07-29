@@ -33,7 +33,13 @@ SOURCES = [
     {"bank": "DNB", "url": "https://www.dnb.no/bedrift/dagligbank/betaling/prisliste", "js_required": False},
     {"bank": "SB1 SMN", "url": "https://www.sparebank1.no/nb/smn/bedrift/kundeservice/bestill/prisliste.html", "js_required": True, "wait_selector": ".accordion"},
     {"bank": "SB1 Østlandet", "url": "https://www.sparebank1.no/nb/ostlandet/bedrift/kundeservice/bestill/prisliste.html", "js_required": True, "wait_selector": ".accordion"},
+    {"bank": "BN Bank", "url": "https://www.bnbank.no/bedrift/priser/", "js_required": True, "wait_selector": ".dropdown-table"},
+    {"bank": "Sparebanken Norge", "url": "https://www.spv.no/bedrift/prisliste-bedriftsmarked", "js_required": True, "wait_selector": "h3"},
 ]
+
+# Banker med sideoppsett som ikke bruker <table> (div/dl-baserte prislister) —
+# rutes til egen uttrekksfunksjon i stedet for ekstraher_prisrader().
+BANK_PARSERS = {}  # fylles ut lenger ned, etter at parserne er definert
 
 OUTPUT_FILE   = Path("bankpriser.html")
 SNAPSHOT_FILE = Path("bankpriser_snapshot.json")
@@ -41,7 +47,7 @@ DEBUG_FILE    = Path("debug.txt")
 
 # Minimumsantall rader vi forventer fra hver bank.
 # Hvis siden returnerer færre, er noe sannsynligvis galt med URL eller sidestruktur.
-MINIMUM_RADER = {"DNB": 30, "SB1 SMN": 50, "SB1 Østlandet": 50}
+MINIMUM_RADER = {"DNB": 30, "SB1 SMN": 50, "SB1 Østlandet": 50, "BN Bank": 100, "Sparebanken Norge": 120}
 
 # ---------------------------------------------------------------------------
 # Parsing
@@ -70,7 +76,8 @@ def normaliser_verdi(v):
     v = v.strip()
     v = re.sub(r'(?i)^kr\s*', '', v)           # "kr 80" -> "80"
     v = re.sub(r'(?i)\s+kr(\s.*)?$', '', v)    # "1,75 kr" / "1,75 kr per kjop" -> "1,75"
-    v = re.sub(r',-$', '', v)                   # "2,-" -> "2"
+    v = re.sub(r',-\*?$', '', v)                 # "2,-" / "29,-*" -> "2" / "29"
+    v = re.sub(r'(\d)\.(\d)', r'\1,\2', v)       # "3.50" -> "3,50" (norsk desimaltegn)
     return v.strip()
 
 
@@ -96,6 +103,55 @@ def ekstraher_prisrader(html):
                 rader.append((seksjon, celler[0], celler[-1]))
 
     return rader
+
+def ekstraher_prisrader_bnbank(html):
+    """BN Bank: prislisten ligger i div.dropdown-table-akkordeoner, ikke <table>."""
+    soup = BeautifulSoup(html, "html.parser")
+    rader = []
+    for wrapper in soup.select("div.dropdown-table"):
+        tittel = wrapper.select_one(".dropdown-table__header__title")
+        seksjon = rens(tittel.get_text()) if tittel else ""
+        for row in wrapper.select("div.table-row"):
+            for sub in row.select("span.table-row__sub-row"):
+                col1 = sub.select_one(".table-row__col1")
+                col2 = sub.select_one(".table-row__col2")
+                col3 = sub.select_one(".table-row__col3")
+                label = rens(col1.get_text()) if col1 else ""
+                verdi = (rens(col3.get_text()) if col3 else "") or (rens(col2.get_text()) if col2 else "")
+                if label and verdi and label != verdi:
+                    rader.append((seksjon, label, verdi))
+    return rader
+
+
+def ekstraher_prisrader_spv(html):
+    """Sparebanken Norge: hver prisrad er et par <p>-tagger, ikke <table>.
+    Seksjon hentes fra nærmeste foregående h3/h4 (h4 overstyrer h3 for underseksjoner
+    som Kapitalkonto/Klientkonto, som ellers ville arvet den brede h3-seksjonen)."""
+    soup = BeautifulSoup(html, "html.parser")
+    rader = []
+    heading_tags = {"h3", "h4"}
+    for div in soup.find_all("div"):
+        ps = div.find_all("p", recursive=False)
+        if len(ps) != 2:
+            continue
+        label = rens(ps[0].get_text())
+        verdi = rens(ps[1].get_text())
+        if not label or not verdi or label == verdi:
+            continue
+        seksjon = ""
+        for forgjenger in div.find_all_previous():
+            if forgjenger.name in heading_tags:
+                kandidat = rens(forgjenger.get_text())
+                if kandidat:
+                    seksjon = kandidat
+                    break
+        rader.append((seksjon, label, verdi))
+    return rader
+
+
+BANK_PARSERS["BN Bank"] = ekstraher_prisrader_bnbank
+BANK_PARSERS["Sparebanken Norge"] = ekstraher_prisrader_spv
+
 
 def fp(rader, seksjon_ord, label_ord=None, maks=25):
     for seksjon, label, verdi in rader:
@@ -143,42 +199,67 @@ def parse_priser(bank, rader):
         "bank": bank,
         "Driftskonto rente": (
             fp(r, ["driftskonto"], ["bedriftskonto", "rente"]) or
-            fp(r, ["driftskonto næringsliv"], ["rente"])
+            fp(r, ["driftskonto næringsliv"], ["rente"]) or
+            fp(r, ["renteoversikt"], ["driftskonto"]) or             # BN Bank
+            fp(r, ["bedriftskonto"], ["rente p.a."])                 # Sparebanken Norge
         ),
-        "Klientkonto rente": fp(r, ["klientkonto"], ["klientkonto", "rente"]),
+        "Klientkonto rente": (
+            fp(r, ["klientkonto"], ["klientkonto", "rente"]) or
+            fp(r, ["klientkonto"], ["fra første krone"])             # Sparebanken Norge
+        ),
         "Plasseringskonto (standard)": (
             fp(r, None, ["rente fra første krone"]) or
             fp(r, ["plasseringskonto bedrift"], ["rente kr 750"]) or
-            fp(r, ["plasseringskonto"], ["rente"], maks=10)
+            fp(r, ["plasseringskonto"], ["rente"], maks=10) or
+            fp(r, ["renteoversikt"], ["plasseringskonto > nok 100 000"]) or  # BN Bank
+            fp(r, ["sparekonto bedrift"], ["fra første krone"], maks=10)      # Sparebanken Norge
         ),
         "Plasseringskonto+ (1M+)": (
             fp(r, ["plasseringskonto pluss"], ["rente 1 mill"]) or
-            fp(r, ["plasseringskonto+"], ["rente"])
+            fp(r, ["plasseringskonto+"], ["rente"]) or
+            fp(r, ["renteoversikt"], ["kapitalkonto > nok 1 000 000"]) or  # BN Bank
+            fp(r, ["kapitalkonto"], ["fra første krone"])                  # Sparebanken Norge (krever min. 1 mill.)
         ),
-        "Depositumskonto rente": fp(r, ["depositumskonto", "depositumkonto"], ["rente"]),
+        "Depositumskonto rente": (
+            fp(r, ["depositumskonto", "depositumkonto"], ["rente"]) or
+            fp(r, ["renteoversikt"], ["depositumskonto"])             # BN Bank
+        ),
         "Fastrente 6 mnd": (
             fp(r, ["binding i 3 måneder"], ["innskudd fra 25.000 til 10"]) or
-            fp(r, ["fastrenteinnskudd"], ["6 måneders innskudd", "rente ved 6"])
+            fp(r, ["fastrenteinnskudd"], ["6 måneders innskudd", "rente ved 6"]) or
+            fp(r, ["renteoversikt"], ["fastrente 6 måneder"]) or       # BN Bank
+            fp(r, ["6 måneders innskudd"], ["nominell rente"])         # Sparebanken Norge
         ),
         "Fastrente 12 mnd": (
             fp(r, ["binding i 6 måneder"], ["innskudd fra 25 000 til 100"]) or
-            fp(r, ["fastrenteinnskudd"], ["12 måneders innskudd", "rente ved 12"])
+            fp(r, ["fastrenteinnskudd"], ["12 måneders innskudd", "rente ved 12"]) or
+            fp(r, ["renteoversikt"], ["fastrente 12 måneder"]) or      # BN Bank
+            fp(r, ["12 måneders innskudd"], ["nominell rente"])        # Sparebanken Norge
         ),
         "Utbetaling m/KID (kr)": (
             fp(r, ["elektroniske utbetalinger via bedriftsnettbank",
                    "utbetalinger i norge"], ["med kid"]) or
             fp(r, ["nettbank bedrift"], ["betaling med kid"]) or
-            fp(r, ["utbetalinger"], ["betaling med kid"])
+            fp(r, ["utbetalinger"], ["betaling med kid"]) or
+            fp(r, ["nettbank bedrift"], ["betaling m/kid"]) or         # BN Bank
+            fp(r, ["nettbank bedrift"], ["med kid"])                   # Sparebanken Norge
         ),
-        "Lønnskjøring (kr)": fp(r, ["utbetalinger i norge","nettbank bedrift","utbetalinger"], ["lønnsutbetaling","lønnsoverførs"]),
+        "Lønnskjøring (kr)": (
+            fp(r, ["utbetalinger i norge","nettbank bedrift","utbetalinger"], ["lønnsutbetaling","lønnsoverførs"]) or
+            fp(r, ["nettbank bedrift"], ["lønnsutbetaling"]) or        # BN Bank
+            fp(r, ["utbetalinger i norge"], ["lønn"], maks=10)         # Sparebanken Norge
+        ),
         "Internasjonal betaling (kr)": (
             fp(r, ["betale til utlandet","utenlands betalingsformidling"], ["øvrige betalinger","øvrige ordinære"]) or
-            fp(r, ["betaling til utlandet"], ["norske kroner"])
+            fp(r, ["betaling til utlandet"], ["norske kroner"]) or
+            fp(r, ["betalinger til/fra utlandet"], ["øvrige swift-betalinger"]) or  # BN Bank
+            fp(r, ["betalinger til utlandet"], ["ordinær swift-overførsel", "ordinær overføring"])  # Sparebanken Norge
         ),
         "eFaktura per faktura (kr)": (
             fp(r, ["registrere og motta efaktura", "registrere og motta eFaktura"], ["registrere efaktura, per faktura"]) or
-            fp(r, ["efaktura b2c"], ["efaktura betalingskrav"]) or
-            fp(r, ["fakturatjenesten"], ["pr faktura utsendelse"])
+            fp(r, ["efaktura b2c"], ["efaktura betalingskrav"]) or      # dekker også BN Bank
+            fp(r, ["fakturatjenesten"], ["pr faktura utsendelse"]) or
+            fp(r, ["efaktura b2c"], ["per sendt faktura"])              # Sparebanken Norge
         ),
 
         # --- Kontohold og daglige tjenester ---
@@ -188,11 +269,15 @@ def parse_priser(bank, rader):
         #   ERP-integrasjon: 150 kr/mnd (eget produkt, legges til enten 0 eller 69)
         # SB1 SMN: uten integrasjon 0 kr, med integrasjon 300 kr
         # SB1 Ostlandet: uten integrasjon 120 kr, med integrasjon 300 kr
+        # BN Bank: "Enkel"-pakke uten integrasjon 29 kr, "Standard"-pakke m/integrasjon 89 kr (totalpris)
+        # Sparebanken Norge: Basis kundeforhold uten integrasjon 95 kr, tillegg for integrasjon 350 kr (totalpris, inkl. basis)
         "Nettbank uten integrasjon (kr/mnd)": (
             # DNB: section "Etablering av bedriftsnettbank" er headingen parser finner
             # (off-by-one) for abonnementstabellen uten integrasjon
             fp(r, ["etablering av bedriftsnettbank"], ["inkludert første bruker"]) or
-            fp(r, ["nettbank bedrift"], ["uten integrasjon", "uten filover"])
+            fp(r, ["nettbank bedrift"], ["uten integrasjon", "uten filover"]) or
+            fp(r, ["nettbank bedrift enkel"], ["fast månedsgebyr"]) or  # BN Bank
+            fp(r, ["basis kundeforhold"], ["per måned"])                # Sparebanken Norge
         ),
 
         "Nettbank bundle (kr/mnd)": (
@@ -202,7 +287,9 @@ def parse_priser(bank, rader):
         "ERP-integrasjon (kr/mnd)": (
             # DNB: section "Abonnementspris bedriftsnettbank Per mån" (off-by-one) + label "Første bruker"
             fp(r, ["abonnementspris bedriftsnettbank per mån", "abonnementspris bedriftsnettbank per man"], ["første bruker"]) or
-            fp(r, ["nettbank bedrift"], ["integrasjon mot økonomisystem", "med filoverf"])
+            fp(r, ["nettbank bedrift"], ["integrasjon mot økonomisystem", "med filoverf"]) or
+            fp(r, ["nettbank bedrift standard"], ["fast månedsgebyr"]) or          # BN Bank (totalpris m/integrasjon)
+            fp(r, None, ["tillegg for regnskapsintegrasjon"])                       # Sparebanken Norge (totalpris m/integrasjon)
         ),
 
         # Debitkort (Visa) årspris:
@@ -212,13 +299,16 @@ def parse_priser(bank, rader):
         "Debitkort Visa årspris": (
             fp(r, ["bedriftskort med visa"], ["årsavgift"]) or    # DNB: seksjonnavn fra debug
             fp(r, ["bankkort"], ["årspris"]) or                   # SB1 SMN: standalone 200 kr
-            fp(r, ["visa bedrift"], ["årspris pr kort"])           # SB1 Østlandet
+            fp(r, ["visa bedrift"], ["årspris pr kort"]) or        # SB1 Østlandet
+            fp(r, ["bedriftskort"], ["årsgebyr"]) or               # BN Bank
+            fp(r, ["bedriftskort (tilknyttet driftskonto)"], ["årspris"])  # Sparebanken Norge
         ),
 
         "Kortgebyr per kjøp": (
             fp(r, ["bedriftskort med visa"], ["varekjøp i norge"]) or  # DNB: 2,50 kr
             fp(r, ["bankkort"], ["varekjøp"]) or                        # SB1 SMN: 4 kr
-            fp(r, ["visa bedrift"], ["varekjøp i norge"])                # SB1 Østlandet: 2,50
+            fp(r, ["visa bedrift"], ["varekjøp i norge"]) or             # SB1 Østlandet: 2,50
+            fp(r, ["bedriftskort"], ["varekjøp i norge"])                 # BN Bank + Sparebanken Norge: 2,50
         ),
     }
 
@@ -293,12 +383,16 @@ FELT_DISPLAY = {
 
 BANK_DISPLAY = {
     "SB1 Østlandet": "SB1 Øst",
+    "Sparebanken Norge": "SB Norge",
 }
 
 # Priser som ikke scrapes — oppdater manuelt ved behov
-EKSTRA_BRUKER_PRIS  = {"DNB": 45, "SB1 SMN": 50, "SB1 Østlandet": 40}
-KID_ABO_PRIS        = {"DNB": 90, "SB1 SMN": 95, "SB1 Østlandet": 95}
-KID_INNBET_PRIS_STK = {"DNB": 2.2, "SB1 SMN": 2.0, "SB1 Østlandet": 2.0}
+# BN Bank: "ubegrenset antall brukere" er inkludert i alle pakker -> 0 kr ekstra bruker.
+# KID-abonnement/innbetaling for BN og Sparebanken Norge hentet fra deres OCR-seksjon
+# (månedspris / transaksjonspris for innbetaling med KID).
+EKSTRA_BRUKER_PRIS  = {"DNB": 45, "SB1 SMN": 50, "SB1 Østlandet": 40, "BN Bank": 0, "Sparebanken Norge": 50}
+KID_ABO_PRIS        = {"DNB": 90, "SB1 SMN": 95, "SB1 Østlandet": 95, "BN Bank": 85, "Sparebanken Norge": 95}
+KID_INNBET_PRIS_STK = {"DNB": 2.2, "SB1 SMN": 2.0, "SB1 Østlandet": 2.0, "BN Bank": 2.0, "Sparebanken Norge": 2.25}
 
 IKONER = {
     "person": (
@@ -457,10 +551,12 @@ def _bank_rader(s, p):
     total = 0.0
 
     # Nettbank + integrasjon
-    if bank == "SB1 Østlandet" and med_int:
+    # SB1 Østlandet, BN Bank og Sparebanken Norge oppgir én totalpris for nettbank+integrasjon
+    # (ikke et separat tillegg som DNB/SB1 SMN), så "ERP-integrasjon" brukes direkte som månedspris.
+    if bank in ("SB1 Østlandet", "BN Bank", "Sparebanken Norge") and med_int:
         nb = til_float(p.get("ERP-integrasjon (kr/mnd)"))
         rader.append(("Månedspris/nettbank", kr(nb)))
-        rader.append(("Integrasjon", "inkl. i 300"))
+        rader.append(("Integrasjon", f"inkl. i {kr(nb)}"))
         total += nb
     else:
         nb = til_float(p.get("Nettbank uten integrasjon (kr/mnd)"))
@@ -520,7 +616,7 @@ def _bank_rader(s, p):
 def beregn_scenarioer(alle_priser):
     """Beregn scenarioverdier fra scrapede priser og aktivitetsparametere."""
     bank_dict = {p["bank"]: p for p in alle_priser}
-    banker = ["DNB", "SB1 SMN", "SB1 Østlandet"]
+    banker = ["DNB", "SB1 SMN", "SB1 Østlandet", "BN Bank", "Sparebanken Norge"]
     result = []
     for s in SCENARIOER:
         folio_r = _folio_rader(s)
@@ -539,11 +635,16 @@ FORUTSETNINGER = [
      "Integrasjon mot regnskapssystem (150 kr/mnd) er alltid et separat tillegg."),
     ("<strong>SB1 Østlandet nettbank + integrasjon:</strong> 300 kr/mnd er totalpris med filoverføring/integrasjon — "
      "ikke 120 + 300. Du velger enten 120 kr (uten) eller 300 kr (med)."),
-    ("<strong>KID-abonnement:</strong> DNB og SB1 tar 90–95 kr/mnd i abonnementsavgift for KID-innbetalingsmottak, "
+    ("<strong>BN Bank nettbank + integrasjon:</strong> «Enkel»-pakke uten integrasjon er 29 kr/mnd, «Standard»-pakke "
+     "med integrasjon er 89 kr/mnd totalt. Ubegrenset antall brukere er inkludert i alle pakker."),
+    ("<strong>Sparebanken Norge nettbank + integrasjon:</strong> Basis kundeforhold uten integrasjon er 95 kr/mnd. "
+     "Tillegget for regnskapsintegrasjon (350 kr/mnd) er totalpris og inkluderer basis kundeforhold."),
+    ("<strong>KID-abonnement:</strong> DNB og SB1 tar 85–95 kr/mnd i abonnementsavgift for KID-innbetalingsmottak, "
      "i tillegg til per-transaksjonsprisen. Folio har ingen slik abonnementsavgift."),
-    ("<strong>Kortavgift:</strong> DNB og SB1 tar 200–295 kr/år per bedriftskort (÷12 i beregningene). "
+    ("<strong>Kortavgift:</strong> DNB og SB1 tar 200–500 kr/år per bedriftskort (÷12 i beregningene). "
      "Folio inkluderer ett kort; ekstra kort koster 89 kr/mnd kun ved bruk."),
-    ("<strong>Varekjøp med kort:</strong> DNB 2,50 kr, SB1 SMN 4 kr, SB1 Østlandet 2,50 kr, Folio 0 kr."),
+    ("<strong>Varekjøp med kort:</strong> DNB 2,50 kr, SB1 SMN 4 kr, SB1 Østlandet 2,50 kr, BN Bank 2,50 kr, "
+     "Sparebanken Norge 2,50 kr, Folio 0 kr."),
     ("<strong>Ikke inkludert:</strong> Renter på innskudd (se pristabell nedenfor), internasjonale betalinger, "
      "AvtaleGiro, terminaler og andre spesialtjenester."),
 ]
@@ -594,8 +695,8 @@ _HTML_CSS = """
     width: 100%; border-collapse: collapse; font-size: 0.97rem;
     font-variant-numeric: tabular-nums; table-layout: fixed;
   }
-  table.summary col.col-name { width: 40%; }
-  table.summary col.col-bank { width: 15%; }
+  table.summary col.col-name { width: 28%; }
+  table.summary col.col-bank { width: 12%; }
   table.summary thead th {
     text-align: right; font-size: .65rem; font-weight: 700; letter-spacing: .05em;
     text-transform: uppercase; color: var(--ink-light);
@@ -718,10 +819,12 @@ def _td_val(v):
 
 
 LOGO_FILER = {
-    "Folio":          ("logoer/Folio icon square.png", "image/png",  -3),
-    "DNB":            ("logoer/DNB_ASA.png",           "image/png",  -9),
-    "SB1 SMN":        ("logoer/spb1.png",              "image/png", 8),
-    "SB1 Østlandet":  ("logoer/spb1.png",              "image/png", 8),
+    "Folio":              ("logoer/Folio icon square.png", "image/png",  -3),
+    "DNB":                ("logoer/DNB_ASA.png",           "image/png",  -9),
+    "SB1 SMN":            ("logoer/spb1.png",              "image/png", 8),
+    "SB1 Østlandet":      ("logoer/spb1.png",              "image/png", 8),
+    "BN Bank":            ("logoer/BN_Bank.png",           "image/png", 8),
+    "Sparebanken Norge":  ("logoer/Sparebanken_Norge.png", "image/png", -5),
 }
 
 def _logo_tag(bank):
@@ -938,7 +1041,8 @@ async def main():
             kombinert_html = ""
             for kilde in kilder:
                 kombinert_html += await hent_html(kilde, browser)
-            rader = ekstraher_prisrader(kombinert_html)
+            parser_fn = BANK_PARSERS.get(bank, ekstraher_prisrader)
+            rader = parser_fn(kombinert_html)
             alle_rader[bank] = rader
 
             min_rader = MINIMUM_RADER.get(bank, 10)

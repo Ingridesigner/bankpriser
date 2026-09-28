@@ -72,21 +72,21 @@
     "Kortgebyr per kjøp": "2,50"
   },
   "Sparebanken Norge": {
-    "Driftskonto rente": "0.00%",
-    "Klientkonto rente": "3,05 %",
-    "Plasseringskonto (standard)": "3,25 %",
-    "Plasseringskonto+ (1M+)": "4,00 %",
+    "Driftskonto rente": null,
+    "Klientkonto rente": null,
+    "Plasseringskonto (standard)": null,
+    "Plasseringskonto+ (1M+)": null,
     "Depositumskonto rente": null,
-    "Fastrente 6 mnd": "4,80 %",
-    "Fastrente 12 mnd": "4,70 %",
-    "Utbetaling m/KID (kr)": "1,75 kr",
-    "Lønnskjøring (kr)": "2 kr",
-    "Internasjonal betaling (kr)": "75 kr",
-    "eFaktura per faktura (kr)": "4 kr",
-    "Nettbank uten integrasjon (kr/mnd)": "95 kr",
+    "Fastrente 6 mnd": null,
+    "Fastrente 12 mnd": null,
+    "Utbetaling m/KID (kr)": null,
+    "Lønnskjøring (kr)": null,
+    "Internasjonal betaling (kr)": null,
+    "eFaktura per faktura (kr)": null,
+    "Nettbank uten integrasjon (kr/mnd)": null,
     "Nettbank bundle (kr/mnd)": null,
-    "ERP-integrasjon (kr/mnd)": "350 kr",
-    "Debitkort Visa årspris": "300 kr",
-    "Kortgebyr per kjøp": "2,50 kr"
+    "ERP-integrasjon (kr/mnd)": null,
+    "Debitkort Visa årspris": null,
+    "Kortgebyr per kjøp": null
   }
 }

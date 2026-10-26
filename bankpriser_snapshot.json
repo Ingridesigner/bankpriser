@@ -56,8 +56,8 @@
   "BN Bank": {
     "Driftskonto rente": "0,05 %",
     "Klientkonto rente": null,
-    "Plasseringskonto (standard)": "2,75 % (3,00 % fra 7.des)",
-    "Plasseringskonto+ (1M+)": "3,35 % (3,55 % fra 7.des)",
+    "Plasseringskonto (standard)": null,
+    "Plasseringskonto+ (1M+)": null,
     "Depositumskonto rente": "0,10 %",
     "Fastrente 6 mnd": null,
     "Fastrente 12 mnd": null,
